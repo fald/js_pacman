@@ -1,3 +1,5 @@
+// This can be hella tidied up, but its fuckin' pacman in JS, so no.
+
 document.addEventListener('DOMContentLoaded', () => {
     const grid = document.querySelector('.grid');
     const scoreDisplay = document.getElementById('score');
@@ -5,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const squares = [];
     let ghosts;
     let score = 0;
+    let pills = 238; // distinction between pills + score being you win when no pills left, but score has an infinite softcap
     let pacmanIndex = 490;
 
 
@@ -46,8 +49,57 @@ document.addEventListener('DOMContentLoaded', () => {
             this.className = className;
             this.startIndex = startIndex;
             this.speed = speed;
+            this.startSpeed = speed;
             this.currentIndex = startIndex;
             this.timerId = NaN;
+            this.attributes = ['ghost', this.className];
+            this.scared = false;
+        }
+
+        scare() {
+            this.scared = true;
+        }
+
+        unScare() {
+            // unscare isn't working! Aha, need to bind 'this' so it doesn't refer to some other shit
+            this.scared = false;
+        }
+
+        draw() {
+            for (let a in this.attributes) {
+                squares[this.currentIndex].classList.add(this.attributes[a]);
+            }
+            if (this.scared) {
+                squares[this.currentIndex].classList.add('scared-ghost');
+            }
+        }
+
+        erase() {
+            for (let a in this.attributes) {
+                squares[this.currentIndex].classList.remove(this.attributes[a]);
+            }
+            squares[this.currentIndex].classList.remove('scared-ghost');
+        }
+
+        reset() {
+            this.currentIndex = this.startIndex;
+            this.scared = false;
+        }
+
+        touching_pacman() {
+            if (squares[this.currentIndex].classList.contains('pac-man')) {
+                if (this.scared) {
+                    score += 100
+                    scoreDisplay.innerHTML = score;
+                    this.reset();
+                } else {
+                    game_over();
+                }
+            }
+        }
+
+        move(direction) {
+
         }
     }
 
@@ -57,6 +109,27 @@ document.addEventListener('DOMContentLoaded', () => {
         new Ghost('inky', 351, 300),
         new Ghost('clyde', 379, 500)
     ]
+
+    function game_over() {
+        ghosts.forEach(
+            ghost => clearInterval(ghost.timerId)
+        )
+        document.removeEventListener('keydown', movePacman);
+        setTimeout(function() {
+            alert('Game over!'), 500
+        })
+        scoreDisplay.innerHTML = " GAME OVER";
+    }
+
+    function game_win() {
+        ghosts.forEach(
+            ghost => clearInterval(ghost.timerId)
+        )
+        document.removeEventListener('keydown', movePacman);
+        setTimeout(function() {
+            alert('You win!'), 500
+        })
+    }
 
     // 0 = dots. 1 = wall, 2 = lair, 3 = power pellet, 4 = empty
     // draw + render grid
@@ -141,28 +214,29 @@ document.addEventListener('DOMContentLoaded', () => {
         // Eaten a dot?
         if (squares[pacmanIndex].classList.contains('pac-dot')) {
             score += 1;
+            pills -= 1;
             scoreDisplay.innerHTML = score;
             squares[pacmanIndex].classList.remove('pac-dot');
         }
         // P O W E R E D   U P ?
         if (squares[pacmanIndex].classList.contains('power-pellet')) {
             score += 10;
+            scoreDisplay.innerHTML = score;
+            pills -= 1;
             squares[pacmanIndex].classList.remove('power-pellet');
             ghosts.forEach(ghost => {
-
+                ghost.scare();
+                setTimeout(ghost.unScare.bind(ghost), 10000);
             })
         }
-        // Game Over?
-        if (square[pacmanIndex].classList.contains('ghost')) {
-
-        }
-        // Win??
-        if (1) {
-
+        // win?
+        if (pills == 0) {
+            game_win();
         }
     }
 
     function moveGhost(ghost) {
+        // Put this in the Ghost class
         const options = [-1, 1, width, -width];
         // let validOptions = [];
 
@@ -189,12 +263,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let choice = validOptions[Math.floor((Math.random() * validOptions.length))];
 
-            // This is getting old; but writing a fn for it would be overkill I think.
-            squares[ghost.currentIndex].classList.remove('ghost');
-            squares[ghost.currentIndex].classList.remove(ghost.className);
+            ghost.erase();
+            ghost.touching_pacman(); // ugh, before and after move, its slow and awful, but so is writing pacman in CSS/JS I guess
             ghost.currentIndex += choice;
-            squares[ghost.currentIndex].classList.add('ghost');
-            squares[ghost.currentIndex].classList.add(ghost.className);
+            ghost.touching_pacman();
+            // if ((squares[ghost.currentIndex].classList.contains('pac-man')
+            // && (ghost.scared))) {
+            //     ghost.reset();
+            // }
+            ghost.draw();
             
             
         }, ghost.speed);
@@ -203,9 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
     createBoard();
     squares[pacmanIndex].classList.add('pac-man');
     ghosts.forEach(ghost => {
-        squares[ghost.currentIndex].classList.add(ghost.className);
-        squares[ghost.currentIndex].classList.add('ghost');
-        
+        ghost.draw();
         moveGhost(ghost);
     })
     
